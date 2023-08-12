@@ -1,1 +1,1 @@
-# @johnlindquist/mac-clipboard-listener
+# @johnlindquist/mac-frontmost
