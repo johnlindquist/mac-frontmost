@@ -1,3 +1,5 @@
 import { getFrontmostApp } from "../index.js"
 
-console.log(getFrontmostApp())
+setInterval(() => {
+  console.log(getFrontmostApp())
+}, 1000)

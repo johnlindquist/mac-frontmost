@@ -4,7 +4,10 @@
 
 Napi::Value GetFrontmostApp(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
-  NSRunningApplication *frontmostApplication = [[NSWorkspace sharedWorkspace] frontmostApplication];
+  NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+  NSDictionary* activeAppDict = [[NSWorkspace sharedWorkspace] activeApplication];
+  NSRunningApplication *frontmostApplication = [NSRunningApplication runningApplicationWithProcessIdentifier:[[activeAppDict objectForKey:@"NSApplicationProcessIdentifier"] intValue]];
+
 
   Napi::Object result = Napi::Object::New(env);
   result.Set("localizedName", Napi::String::New(env, [frontmostApplication.localizedName UTF8String]));
