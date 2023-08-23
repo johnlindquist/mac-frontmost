@@ -30,10 +30,26 @@ Napi::Value GetFrontmostApp(const Napi::CallbackInfo& info) {
       result.Set("height", Napi::Number::New(env, bounds.size.height));
 
       // Getting the window name
-      CFStringRef windowName = (CFStringRef)CFDictionaryGetValue(window, kCGWindowName);
-      if (windowName != NULL) {
-        result.Set("windowTitle", Napi::String::New(env, [(__bridge NSString *)windowName UTF8String]));
+     AXUIElementRef frontmostApp = AXUIElementCreateApplication(frontmostApplication.processIdentifier);
+    CFArrayRef windows;
+    AXError err = AXUIElementCopyAttributeValues(frontmostApp, kAXWindowsAttribute, 0, 1, &windows);
+    if (err == kAXErrorSuccess && CFArrayGetCount(windows) > 0) {
+      AXUIElementRef window = (AXUIElementRef)CFArrayGetValueAtIndex(windows, 0);
+      CFStringRef windowTitle = NULL;
+      err = AXUIElementCopyAttributeValue(window, kAXTitleAttribute, (CFTypeRef *)&windowTitle);
+      if (err == kAXErrorSuccess && windowTitle != NULL) {
+        result.Set("windowTitle", Napi::String::New(env, [(__bridge NSString *)windowTitle UTF8String]));
+      } else {
+        result.Set("windowTitle", Napi::String::New(env, ""));
       }
+      if (windowTitle != NULL) {
+        CFRelease(windowTitle);
+      }
+      CFRelease(windows);
+    }
+    CFRelease(frontmostApp);
+
+
 
       // You can add more window attributes here as needed
       break;
