@@ -5,9 +5,8 @@
 Napi::Value GetFrontmostApp(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
-  NSDictionary* activeAppDict = [[NSWorkspace sharedWorkspace] activeApplication];
+  NSDictionary* activeAppDict = [workspace activeApplication];
   NSRunningApplication *frontmostApplication = [NSRunningApplication runningApplicationWithProcessIdentifier:[[activeAppDict objectForKey:@"NSApplicationProcessIdentifier"] intValue]];
-
 
   Napi::Object result = Napi::Object::New(env);
   result.Set("localizedName", Napi::String::New(env, [frontmostApplication.localizedName UTF8String]));
@@ -17,48 +16,53 @@ Napi::Value GetFrontmostApp(const Napi::CallbackInfo& info) {
   result.Set("isFinishedLaunching", Napi::Boolean::New(env, frontmostApplication.isFinishedLaunching));
   result.Set("processIdentifier", Napi::Number::New(env, frontmostApplication.processIdentifier));
 
-  CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
-  for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++) {
-    CFDictionaryRef window = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
-    NSNumber *ownerPID = (NSNumber *)CFDictionaryGetValue(window, kCGWindowOwnerPID);
-    if ([ownerPID intValue] == frontmostApplication.processIdentifier) {
-      CGRect bounds;
-      CGRectMakeWithDictionaryRepresentation((CFDictionaryRef)CFDictionaryGetValue(window, kCGWindowBounds), &bounds);
-      result.Set("x", Napi::Number::New(env, bounds.origin.x));
-      result.Set("y", Napi::Number::New(env, bounds.origin.y));
-      result.Set("width", Napi::Number::New(env, bounds.size.width));
-      result.Set("height", Napi::Number::New(env, bounds.size.height));
+  CFArrayRef windows;
+  AXUIElementRef frontmostApp = AXUIElementCreateApplication(frontmostApplication.processIdentifier);
+  AXError err = AXUIElementCopyAttributeValues(frontmostApp, kAXWindowsAttribute, 0, 100, &windows);
+  if (err == kAXErrorSuccess && CFArrayGetCount(windows) > 0) {
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++) {
+      AXUIElementRef window = (AXUIElementRef)CFArrayGetValueAtIndex(windows, i);
+      CFStringRef windowTitle = NULL;
+      err = AXUIElementCopyAttributeValue(window, kAXTitleAttribute, (CFTypeRef *)&windowTitle);
+      if (err == kAXErrorSuccess && windowTitle != NULL) {
+        result.Set("windowTitle", Napi::String::New(env, [(__bridge NSString *)windowTitle UTF8String]));
+        result.Set("windowIndex", Napi::Number::New(env, i));
+        CFRelease(windowTitle);
+      }
 
-      // Getting the window name
-    NSRunningApplication *frontmostApplication = [NSRunningApplication runningApplicationWithProcessIdentifier:[[activeAppDict objectForKey:@"NSApplicationProcessIdentifier"] intValue]];
-
-AXUIElementRef frontmostApp = AXUIElementCreateApplication(frontmostApplication.processIdentifier);
-CFArrayRef windows;
-AXError err = AXUIElementCopyAttributeValues(frontmostApp, kAXWindowsAttribute, 0, 1, &windows);
-if (err == kAXErrorSuccess && CFArrayGetCount(windows) > 0) {
-  AXUIElementRef window = (AXUIElementRef)CFArrayGetValueAtIndex(windows, 0);
-  CFStringRef windowTitle = NULL;
-  err = AXUIElementCopyAttributeValue(window, kAXTitleAttribute, (CFTypeRef *)&windowTitle);
-  if (err == kAXErrorSuccess && windowTitle != NULL) {
-    result.Set("windowTitle", Napi::String::New(env, [(__bridge NSString *)windowTitle UTF8String]));
-    CFRelease(windowTitle);
-  } else {
-    result.Set("windowTitle", Napi::String::New(env, ""));
-  }
-}
-if (frontmostApp) CFRelease(frontmostApp);
-if (windows) CFRelease(windows);
-
-
-
-
-
-
-
-      // You can add more window attributes here as needed
       break;
     }
+  } else {
+    result.Set("windowTitle", Napi::String::New(env, ""));
+    result.Set("windowIndex", Napi::Number::New(env, -1));
   }
+
+  if (frontmostApp) CFRelease(frontmostApp);
+  if (windows) CFRelease(windows);
+
+  // ...
+
+CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++) {
+  CFDictionaryRef window = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+  NSNumber *ownerPID = (NSNumber *)CFDictionaryGetValue(window, kCGWindowOwnerPID);
+  if ([ownerPID intValue] == frontmostApplication.processIdentifier) {
+    NSNumber *windowID = (NSNumber *)CFDictionaryGetValue(window, kCGWindowNumber);
+    if (windowID != nullptr) {
+      result.Set("windowID", Napi::Number::New(env, [windowID intValue]));
+    }
+    CGRect bounds;
+    CGRectMakeWithDictionaryRepresentation((CFDictionaryRef)CFDictionaryGetValue(window, kCGWindowBounds), &bounds);
+    result.Set("x", Napi::Number::New(env, bounds.origin.x));
+    result.Set("y", Napi::Number::New(env, bounds.origin.y));
+    result.Set("width", Napi::Number::New(env, bounds.size.width));
+    result.Set("height", Napi::Number::New(env, bounds.size.height));
+    break;
+  }
+}
+
+// ...
+
 
   CFRelease(windowList);
 

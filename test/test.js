@@ -1,5 +1,7 @@
 import { getFrontmostApp } from "../index.js"
 
 setInterval(() => {
-  console.log(getFrontmostApp())
+  let frontmost = getFrontmostApp()
+
+  console.log(`id: ${frontmost?.windowID}: ${frontmost?.localizedName} -> ${frontmost?.windowTitle}`)
 }, 1000)
